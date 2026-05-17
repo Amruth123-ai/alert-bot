@@ -20,6 +20,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Convert owner to lowercase
+        run: echo "OWNER_LC=${OWNER,,}" >> $GITHUB_ENV
+        env:
+          OWNER: ${{ github.repository_owner }}
+
       - name: Login GHCR
         uses: docker/login-action@v3
         with:
@@ -30,9 +35,9 @@ jobs:
       - name: Build Image
         run: |
           docker build \
-          -t ghcr.io/${{ github.repository_owner }}/delta-ws-bot:latest .
+          -t ghcr.io/${{ env.OWNER_LC }}/delta-ws-bot:latest .
 
       - name: Push Image
         run: |
           docker push \
-          ghcr.io/${{ github.repository_owner }}/delta-ws-bot:latest
+          ghcr.io/${{ env.OWNER_LC }}/delta-ws-bot:latest
