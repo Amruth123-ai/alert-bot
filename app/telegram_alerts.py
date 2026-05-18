@@ -10,27 +10,57 @@ from app.logger import logger
 
 async def send_telegram_alert(message):
 
-    url = (
-        f"https://api.telegram.org/"
-        f"bot{BOT_TOKEN}/sendMessage"
-    )
+    try:
 
-    payload = {
-        "chat_id": CHAT_ID,
-        "text": message
-    }
+        logger.info(
+            "Sending Telegram Alert..."
+        )
 
-    async with aiohttp.ClientSession() as session:
+        logger.info(
+            f"BOT_TOKEN: {BOT_TOKEN}"
+        )
 
-        async with session.post(
-            url,
-            json=payload
-        ) as response:
+        logger.info(
+            f"CHAT_ID: {CHAT_ID}"
+        )
 
-            result = await response.text()
+        logger.info(
+            f"MESSAGE: {message}"
+        )
 
-            logger.info(
-                f"Telegram Response: {result}"
-            )
+        url = (
+            f"https://api.telegram.org/"
+            f"bot{BOT_TOKEN}/sendMessage"
+        )
 
-            return result
+        payload = {
+
+            "chat_id":
+            CHAT_ID,
+
+            "text":
+            message
+        }
+
+        async with aiohttp.ClientSession() as session:
+
+            async with session.post(
+                url,
+                json=payload
+            ) as response:
+
+                result = await response.text()
+
+                logger.info(
+                    f"Telegram Response: {result}"
+                )
+
+                return result
+
+    except Exception as e:
+
+        logger.exception(
+            f"Telegram Error: {e}"
+        )
+
+        return None
