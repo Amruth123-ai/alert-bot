@@ -28,11 +28,6 @@ from app.telegram_alerts import (
     send_telegram_alert
 )
 
-from app.state import (
-    load_state,
-    save_state
-)
-
 from app.config import (
     SYMBOL,
     TIMEFRAME
@@ -50,26 +45,8 @@ async def run_bot():
         f"Loaded {len(df)} candles"
     )
 
-    # state load
-    state = load_state()
-
-    # create state if missing
-    if not state:
-
-        save_state({
-            "last_signal": None,
-            "last_alert_timestamp": None
-        })
-
-        state = load_state()
-
-    last_signal = state.get(
-        "last_signal"
-    )
-
-    last_alert_timestamp = state.get(
-        "last_alert_timestamp"
-    )
+    # runtime memory only
+    last_signal = None
 
     websocket = await connect_websocket()
 
@@ -113,10 +90,7 @@ async def run_bot():
             if not candle_data:
                 continue
 
-            # candle parsing
-            # candle parsing
             # delta websocket uses microseconds
-
             candle_timestamp = int(
                 candle_data["candle_start_time"]
             )
@@ -126,7 +100,6 @@ async def run_bot():
                 candle_timestamp // 1_000_000
             )
 
-            # candle parsing
             candle = {
 
                 "timestamp":
@@ -162,7 +135,7 @@ async def run_bot():
                 )
             }
 
-            # update or append candle
+            # update existing candle
             if (
                 df.iloc[-1]["timestamp"]
                 == candle["timestamp"]
@@ -170,6 +143,7 @@ async def run_bot():
 
                 df.iloc[-1] = candle
 
+            # append new candle
             else:
 
                 df = pd.concat([
@@ -179,22 +153,7 @@ async def run_bot():
 
                 df = df.tail(200)
 
-            # process only once per candle
-            current_timestamp = (
-            int(
-                candle_data[
-                    "candle_start_time"
-                ]
-            ) // 1_000_000
-        )
-
-            if (
-                last_alert_timestamp
-                == current_timestamp
-            ):
-                continue
-
-            # indicators
+            # apply indicators
             df = calculate_heikin_ashi(df)
 
             df = apply_indicators(df)
@@ -205,7 +164,7 @@ async def run_bot():
                 f"Generated Signal: {signal}"
             )
 
-            # send signal
+            # send only when signal changes
             if (
                 signal
                 and signal != last_signal
@@ -244,20 +203,8 @@ async def run_bot():
                     f"Signal Sent: {signal}"
                 )
 
+                # update runtime signal
                 last_signal = signal
-
-                last_alert_timestamp = (
-                    current_timestamp
-                )
-
-                save_state({
-
-                    "last_signal":
-                    last_signal,
-
-                    "last_alert_timestamp":
-                    last_alert_timestamp
-                })
 
         except Exception as e:
 
