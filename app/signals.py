@@ -1,8 +1,10 @@
 def generate_signal(df):
 
     # Closed candles only
-    latest = df.iloc[-2]
-    previous = df.iloc[-3]
+    # latest = df.iloc[-2]
+    # previous = df.iloc[-3]
+    latest = df.iloc[-1]
+    previous = df.iloc[-2]
 
     # =====================================
     # MAIN T3 DIRECTION
