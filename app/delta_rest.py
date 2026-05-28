@@ -20,9 +20,41 @@ async def fetch_initial_candles(limit=100):
         timezone.utc
     )
 
-    tf_minutes = int(
-        TIMEFRAME.replace("m", "")
-    )
+    # =====================================
+    # TIMEFRAME TO MINUTES
+    # =====================================
+
+    if TIMEFRAME.endswith("m"):
+
+        tf_minutes = int(
+            TIMEFRAME.replace("m", "")
+        )
+
+    elif TIMEFRAME.endswith("h"):
+
+        tf_minutes = (
+            int(
+                TIMEFRAME.replace("h", "")
+            ) * 60
+        )
+
+    elif TIMEFRAME.endswith("d"):
+
+        tf_minutes = (
+            int(
+                TIMEFRAME.replace("d", "")
+            ) * 1440
+        )
+
+    else:
+
+        raise ValueError(
+            f"Unsupported timeframe: {TIMEFRAME}"
+        )
+
+    # =====================================
+    # START TIME
+    # =====================================
 
     start_time = (
         end_time
