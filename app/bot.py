@@ -2,9 +2,6 @@ import asyncio
 import json
 import pandas as pd
 
-from datetime import datetime
-from zoneinfo import ZoneInfo
-
 from app.logger import logger
 
 from app.delta_rest import (
@@ -57,39 +54,9 @@ async def run_bot():
         "WebSocket connected"
     )
 
-    ist = ZoneInfo("Asia/Kolkata")
-
     while True:
 
         try:
-
-            # --------------------------------------------------
-            # CHECK MARKET DAYS & TIME
-            # Monday=0 ... Sunday=6
-            # Run only Mon-Fri between 18:00 and 23:59 IST
-            # --------------------------------------------------
-            now_ist = datetime.now(ist)
-
-            weekday = now_ist.weekday()
-
-            current_time = now_ist.time()
-
-            is_weekday = weekday < 5
-
-            is_allowed_time = (
-                current_time.hour >= 18
-            )
-
-            if not (is_weekday and is_allowed_time):
-
-                logger.info(
-                    f"Bot paused. Current IST Time: "
-                    f"{now_ist.strftime('%Y-%m-%d %H:%M:%S')}"
-                )
-
-                await asyncio.sleep(60)
-
-                continue
 
             raw_message = await websocket.recv()
 
