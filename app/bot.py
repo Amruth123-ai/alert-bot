@@ -28,6 +28,10 @@ from app.telegram_alerts import (
     send_telegram_alert
 )
 
+from app.trade_sender import (
+    send_trade_signal
+)
+
 from app.config import (
     SYMBOL,
     TIMEFRAME
@@ -38,14 +42,12 @@ async def run_bot():
 
     logger.info("Bot Started")
 
-    # initial candles
     df = await fetch_initial_candles()
 
     logger.info(
         f"Loaded {len(df)} candles"
     )
 
-    # runtime memory only
     last_signal = None
 
     websocket = await connect_websocket()
@@ -64,8 +66,6 @@ async def run_bot():
                 raw_message
             )
 
-            logger.info(data)
-
             # ignore heartbeat
             if data.get("type") == "pong":
                 continue
@@ -74,7 +74,7 @@ async def run_bot():
             if data.get("type") == "subscriptions":
                 continue
 
-            # detect candle message
+            # process candle messages only
             if (
                 "candle"
                 not in str(data).lower()
@@ -90,12 +90,10 @@ async def run_bot():
             if not candle_data:
                 continue
 
-            # delta websocket uses microseconds
             candle_timestamp = int(
                 candle_data["candle_start_time"]
             )
 
-            # convert microseconds → seconds
             candle_timestamp = (
                 candle_timestamp // 1_000_000
             )
@@ -110,32 +108,22 @@ async def run_bot():
                 ),
 
                 "open":
-                float(
-                    candle_data["open"]
-                ),
+                float(candle_data["open"]),
 
                 "high":
-                float(
-                    candle_data["high"]
-                ),
+                float(candle_data["high"]),
 
                 "low":
-                float(
-                    candle_data["low"]
-                ),
+                float(candle_data["low"]),
 
                 "close":
-                float(
-                    candle_data["close"]
-                ),
+                float(candle_data["close"]),
 
                 "volume":
-                float(
-                    candle_data["volume"]
-                )
+                float(candle_data["volume"])
             }
 
-            # update existing candle
+            # update current candle
             if (
                 df.iloc[-1]["timestamp"]
                 == candle["timestamp"]
@@ -143,7 +131,6 @@ async def run_bot():
 
                 df.iloc[-1] = candle
 
-            # append new candle
             else:
 
                 df = pd.concat([
@@ -153,7 +140,7 @@ async def run_bot():
 
                 df = df.tail(200)
 
-            # apply indicators
+            # indicators
             df = calculate_heikin_ashi(df)
 
             df = apply_indicators(df)
@@ -164,46 +151,42 @@ async def run_bot():
                 f"Generated Signal: {signal}"
             )
 
-            # send only when signal changes
+            # signal changed
             if (
                 signal
                 and signal != last_signal
             ):
 
                 telegram_message = (
-
                     "🚀 LONG SIGNAL\n"
-
                     if signal == "LONG"
-
                     else
-
                     "🔻 SHORT SIGNAL\n"
                 )
 
                 telegram_message += (
-
                     f"Symbol: {SYMBOL}\n"
-
-                    f"Timeframe: "
-                    f"{TIMEFRAME.upper()}\n"
-
-                    f"Price: "
-                    f"{candle['close']}\n"
-
-                    f"Trend: "
-                    f"{signal} T3"
+                    f"Timeframe: {TIMEFRAME.upper()}\n"
+                    f"Price: {candle['close']}\n"
+                    f"Trend: {signal} T3"
                 )
 
+                # Telegram Alert
                 await send_telegram_alert(
                     telegram_message
                 )
 
-                logger.info(
-                    f"Signal Sent: {signal}"
+                # FastAPI Trade Bot
+                await send_trade_signal(
+                    signal=signal,
+                    symbol=SYMBOL,
+                    price=candle["close"]
                 )
 
-                # update runtime signal
+                logger.info(
+                    f"Telegram + Trade Signal Sent: {signal}"
+                )
+
                 last_signal = signal
 
         except Exception as e:
