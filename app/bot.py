@@ -32,6 +32,11 @@ from app.trade_sender import (
     send_trade_signal
 )
 
+from app.state import (
+    load_state,
+    save_state
+)
+
 from app.config import (
     SYMBOL,
     TIMEFRAME
@@ -42,13 +47,60 @@ async def run_bot():
 
     logger.info("Bot Started")
 
+    # =====================================
+    # LOAD INITIAL CANDLES
+    # =====================================
+
     df = await fetch_initial_candles()
 
     logger.info(
         f"Loaded {len(df)} candles"
     )
 
-    last_signal = None
+    # =====================================
+    # CALCULATE CURRENT TREND
+    # =====================================
+
+    df = calculate_heikin_ashi(df)
+    df = apply_indicators(df)
+
+    current_signal = generate_signal(df)
+
+    # =====================================
+    # LOAD SAVED STATE
+    # =====================================
+
+    state = load_state()
+
+    last_signal = state.get(
+        "last_signal"
+    )
+
+    # =====================================
+    # FIRST START ONLY
+    # =====================================
+
+    if last_signal is None:
+
+        last_signal = current_signal
+
+        state["last_signal"] = current_signal
+
+        save_state(state)
+
+        logger.info(
+            f"Initial Signal Loaded: {current_signal}"
+        )
+
+    else:
+
+        logger.info(
+            f"Loaded Previous Signal: {last_signal}"
+        )
+
+    # =====================================
+    # CONNECT WEBSOCKET
+    # =====================================
 
     websocket = await connect_websocket()
 
@@ -66,15 +118,15 @@ async def run_bot():
                 raw_message
             )
 
-            # ignore heartbeat
+            # Ignore heartbeat
             if data.get("type") == "pong":
                 continue
 
-            # ignore subscriptions
+            # Ignore subscriptions
             if data.get("type") == "subscriptions":
                 continue
 
-            # process candle messages only
+            # Process candle messages only
             if (
                 "candle"
                 not in str(data).lower()
@@ -123,7 +175,7 @@ async def run_bot():
                 float(candle_data["volume"])
             }
 
-            # update current candle
+            # Update current candle
             if (
                 df.iloc[-1]["timestamp"]
                 == candle["timestamp"]
@@ -140,22 +192,24 @@ async def run_bot():
 
                 df = df.tail(200)
 
-            # indicators
+            # Indicators
             df = calculate_heikin_ashi(df)
-
             df = apply_indicators(df)
 
             signal = generate_signal(df)
 
-            logger.info(
-                f"Generated Signal: {signal}"
-            )
+            # =====================================
+            # SIGNAL CHANGED
+            # =====================================
 
-            # signal changed
             if (
                 signal
                 and signal != last_signal
             ):
+
+                logger.info(
+                    f"NEW SIGNAL: {last_signal} -> {signal}"
+                )
 
                 telegram_message = (
                     "🚀 LONG SIGNAL\n"
@@ -171,12 +225,12 @@ async def run_bot():
                     f"Trend: {signal} T3"
                 )
 
-                # Telegram Alert
+                # Telegram
                 await send_telegram_alert(
                     telegram_message
                 )
 
-                # FastAPI Trade Bot
+                # Trade Bot
                 await send_trade_signal(
                     signal=signal,
                     symbol=SYMBOL,
@@ -187,7 +241,12 @@ async def run_bot():
                     f"Telegram + Trade Signal Sent: {signal}"
                 )
 
+                # Save state
                 last_signal = signal
+
+                state["last_signal"] = signal
+
+                save_state(state)
 
         except Exception as e:
 
