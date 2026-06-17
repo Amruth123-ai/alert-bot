@@ -2,7 +2,7 @@ import aiohttp
 
 from app.logger import logger
 
-FASTAPI_URL = "http://140.245.231.153:8000/webhook"
+FASTAPI_URL = "http://140.245.231.153:8000/signal"
 
 
 async def send_trade_signal(
