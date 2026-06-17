@@ -1,6 +1,8 @@
 import aiohttp
 
+from app.config import TIMEFRAME
 from app.logger import logger
+from datetime import datetime
 
 FASTAPI_URL = "http://140.245.231.153:8000/signal"
 
@@ -21,7 +23,9 @@ async def send_trade_signal(
 
         "sl_points": 900,
 
-        "tp_points": 50
+        "tp_points": 50,
+        "timeframe": TIMEFRAME.upper(),
+    "timestamp": datetime.utcnow().isoformat()
     }
 
     try:
