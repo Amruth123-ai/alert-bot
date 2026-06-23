@@ -42,6 +42,7 @@ from app.config import (
     TIMEFRAME
 )
 
+from datetime import datetime
 
 async def run_bot():
 
@@ -67,7 +68,7 @@ async def run_bot():
     current_signal = generate_signal(df)
 
     # =====================================
-    # LOAD SAVED STATE
+    # LOAD STATE
     # =====================================
 
     state = load_state()
@@ -89,17 +90,19 @@ async def run_bot():
         save_state(state)
 
         logger.info(
-            f"Initial Signal Loaded: {current_signal}"
+            f"Initial Signal Loaded: "
+            f"{current_signal}"
         )
 
     else:
 
         logger.info(
-            f"Loaded Previous Signal: {last_signal}"
+            f"Previous Signal Loaded: "
+            f"{last_signal}"
         )
 
     # =====================================
-    # CONNECT WEBSOCKET
+    # CONNECT WS
     # =====================================
 
     websocket = await connect_websocket()
@@ -112,7 +115,9 @@ async def run_bot():
 
         try:
 
-            raw_message = await websocket.recv()
+            raw_message = (
+                await websocket.recv()
+            )
 
             data = json.loads(
                 raw_message
@@ -122,11 +127,11 @@ async def run_bot():
             if data.get("type") == "pong":
                 continue
 
-            # Ignore subscriptions
+            # Ignore subscription response
             if data.get("type") == "subscriptions":
                 continue
 
-            # Process candle messages only
+            # Process candle events only
             if (
                 "candle"
                 not in str(data).lower()
@@ -143,7 +148,9 @@ async def run_bot():
                 continue
 
             candle_timestamp = int(
-                candle_data["candle_start_time"]
+                candle_data[
+                    "candle_start_time"
+                ]
             )
 
             candle_timestamp = (
@@ -160,22 +167,33 @@ async def run_bot():
                 ),
 
                 "open":
-                float(candle_data["open"]),
+                float(
+                    candle_data["open"]
+                ),
 
                 "high":
-                float(candle_data["high"]),
+                float(
+                    candle_data["high"]
+                ),
 
                 "low":
-                float(candle_data["low"]),
+                float(
+                    candle_data["low"]
+                ),
 
                 "close":
-                float(candle_data["close"]),
+                float(
+                    candle_data["close"]
+                ),
 
                 "volume":
-                float(candle_data["volume"])
+                float(
+                    candle_data["volume"]
+                )
             }
 
             # Update current candle
+
             if (
                 df.iloc[-1]["timestamp"]
                 == candle["timestamp"]
@@ -187,73 +205,150 @@ async def run_bot():
 
                 df = pd.concat([
                     df,
-                    pd.DataFrame([candle])
-                ]).reset_index(drop=True)
+                    pd.DataFrame(
+                        [candle]
+                    )
+                ]).reset_index(
+                    drop=True
+                )
 
                 df = df.tail(200)
 
-            # Indicators
-            df = calculate_heikin_ashi(df)
-            df = apply_indicators(df)
+            # =====================================
+            # APPLY INDICATORS
+            # =====================================
 
-            signal = generate_signal(df)
+            df = calculate_heikin_ashi(
+                df
+            )
+
+            df = apply_indicators(
+                df
+            )
+
+            signal = generate_signal(
+                df
+            )
+
+            logger.info(
+                f"Current Signal: "
+                f"{signal}"
+            )
 
             # =====================================
             # SIGNAL CHANGED
             # =====================================
 
-            if (
-                signal
-                and signal != last_signal
-            ):
+            if signal != last_signal:
 
                 logger.info(
-                    f"NEW SIGNAL: {last_signal} -> {signal}"
+                    f"Signal Changed: "
+                    f"{last_signal}"
+                    f" -> "
+                    f"{signal}"
                 )
 
-                telegram_message = (
-                    "🚀 LONG SIGNAL\n"
-                    if signal == "LONG"
-                    else
-                    "🔻 SHORT SIGNAL\n"
+                # =====================================
+                # TELEGRAM MESSAGE
+                # =====================================
+
+                from datetime import datetime
+                from zoneinfo import ZoneInfo
+
+                alert_time = datetime.now(
+                    ZoneInfo("Asia/Kolkata")
+                ).strftime(
+                    "%Y-%m-%d %H:%M:%S IST"
                 )
+
+                if signal == "LONG":
+
+                    telegram_message = (
+                        "🚀 LONG SIGNAL\n"
+                    )
+
+                elif signal == "SHORT":
+
+                    telegram_message = (
+                        "🔻 SHORT SIGNAL\n"
+                    )
+
+                else:
+
+                    telegram_message = (
+                        "⚪ NEUTRAL SIGNAL\n"
+                    )
 
                 telegram_message += (
-                    f"Symbol: {SYMBOL}\n"
-                    f"Timeframe: {TIMEFRAME.upper()}\n"
-                    f"Price: {candle['close']}\n"
-                    f"Trend: {signal} T3"
-                )
 
-                # Telegram
+
+                        f"Symbol: {SYMBOL}\n"
+
+                        f"Price: "
+                        f"{candle['close']}\n"
+
+                        f"Alert Time: "
+                        f"{alert_time}\n"
+
+                        f"Current Trend: "
+                        f"{signal}\n\n"
+
+                        f"FROM ALERT-BOT"
+                    )
+
+                # =====================================
+                # TELEGRAM ALERT
+                # =====================================
+
                 await send_telegram_alert(
                     telegram_message
                 )
 
-                # Trade Bot
+                # =====================================
+                # FASTAPI TRADE BOT
+                # =====================================
+
                 await send_trade_signal(
-                    signal=signal,
-                    symbol=SYMBOL,
-                    price=candle["close"]
+
+                    previous_signal=
+                    last_signal,
+
+                    signal=
+                    signal,
+
+                    symbol=
+                    SYMBOL,
+
+                    price=
+                    candle["close"]
                 )
 
                 logger.info(
-                    f"Telegram + Trade Signal Sent: {signal}"
+                    "Telegram + Trade "
+                    "Signal Sent"
                 )
 
-                # Save state
+                # =====================================
+                # SAVE STATE
+                # =====================================
+
                 last_signal = signal
 
-                state["last_signal"] = signal
+                state[
+                    "last_signal"
+                ] = signal
 
-                save_state(state)
+                save_state(
+                    state
+                )
 
         except Exception as e:
 
             logger.exception(e)
 
             logger.info(
-                "Reconnecting WebSocket..."
+                "Reconnecting "
+                "WebSocket..."
             )
 
             await asyncio.sleep(5)
