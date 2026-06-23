@@ -61,4 +61,4 @@ def generate_signal(df):
         return "SHORT"
 
     # MIXED COLORS = NEUTRAL
-    return None
+    return "NEUTRAL"
