@@ -1,17 +1,20 @@
-# arr = [0,1,1,0,1,0]
-
-# find_the_biggest_consecutive_num = 
+import requests
 
 
+BOT_TOKEN = "7683947813:AAH2xwTnh2jutZVamkIiHSzw4LEz_yvK6N8"
+CHAT_ID   = "-5040188162"
+MESSAGE = "Hello from Python!"
 
-def sort_arr(arr,a,b,c):
-    result = []
-    for i in arr:
-        value = a*i*i + b*i + c
-        result.append(value)
+url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
-    result.sort()
-    return result
+payload = {
+    "chat_id": CHAT_ID,
+    "text": MESSAGE
+}
 
-arr = [-4,-2,0,2,4]
-print(sort_arr(arr,1,3,5))
+response = requests.post(url, json=payload)
+
+print(response.json())
+
+
+
